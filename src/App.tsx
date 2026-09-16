@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 // אייקונים מובנים כ-SVG עצמאי ללא תלות בספריות חיצוניות
 const IconHardHat = () => (
