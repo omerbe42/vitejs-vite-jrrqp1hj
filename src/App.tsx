@@ -14,25 +14,39 @@ const IconBell = () => <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" 
 const IconUsers = () => <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
 const IconPlus = () => <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
 
-// === הגדרות מערכת ===
 type Role = 'MANAGER' | 'WORKER' | 'CRANE' | 'SIGNALER' | 'CONTRACTOR';
 interface User { id: string; username: string; password: string; name: string; role: Role; }
 interface DocumentItem { id: string; title: string; type: 'DOC' | 'BLUEPRINT'; date: string; }
 
 export default function App() {
-  // --- מסדי נתונים ---
-  const [usersDb, setUsersDb] = useState<User[]>([
-    { id: '1', username: 'admin', password: '123', name: 'עומר בצלאל (מנהל)', role: 'MANAGER' },
-    { id: '2', username: 'worker', password: '123', name: 'אחמד (פועל ניקיון)', role: 'WORKER' },
-    { id: '3', username: 'crane', password: '123', name: 'משה (מנופאי 1)', role: 'CRANE' },
-    { id: '4', username: 'signaler', password: '123', name: 'דוד (אתת מנוף 1)', role: 'SIGNALER' },
-    { id: '5', username: 'contractor', password: '123', name: 'יוסי (קבלן שלד)', role: 'CONTRACTOR' }
-  ]);
+  // === טעינה מהזיכרון המקומי (Local Storage) או ברירת מחדל ===
+  const [usersDb, setUsersDb] = useState<User[]>(() => {
+    const saved = localStorage.getItem('buildguard_users');
+    return saved ? JSON.parse(saved) : [
+      { id: '1', username: 'admin', password: '123', name: 'עומר בצלאל (מנהל)', role: 'MANAGER' },
+      { id: '2', username: 'worker', password: '123', name: 'אחמד (פועל ניקיון)', role: 'WORKER' },
+      { id: '3', username: 'crane', password: '123', name: 'משה (מנופאי 1)', role: 'CRANE' },
+      { id: '4', username: 'signaler', password: '123', name: 'דוד (אתת מנוף 1)', role: 'SIGNALER' },
+      { id: '5', username: 'contractor', password: '123', name: 'יוסי (קבלן שלד)', role: 'CONTRACTOR' }
+    ];
+  });
 
-  const [documentsDb, setDocumentsDb] = useState<DocumentItem[]>([
-    { id: '1', title: 'היתר בניה מעודכן', type: 'DOC', date: '01/09/2026' },
-    { id: '2', title: 'תוכנית אדריכלית קומה 2', type: 'BLUEPRINT', date: '15/09/2026' }
-  ]);
+  const [documentsDb, setDocumentsDb] = useState<DocumentItem[]>(() => {
+    const saved = localStorage.getItem('buildguard_docs');
+    return saved ? JSON.parse(saved) : [
+      { id: '1', title: 'היתר בניה מעודכן', type: 'DOC', date: '01/09/2026' },
+      { id: '2', title: 'תוכנית אדריכלית קומה 2', type: 'BLUEPRINT', date: '15/09/2026' }
+    ];
+  });
+
+  // שמירה לזיכרון המקומי בכל פעם שיש שינוי ברשימה
+  useEffect(() => {
+    localStorage.setItem('buildguard_users', JSON.stringify(usersDb));
+  }, [usersDb]);
+
+  useEffect(() => {
+    localStorage.setItem('buildguard_docs', JSON.stringify(documentsDb));
+  }, [documentsDb]);
 
   // --- סטייט התחברות וסביבה ---
   const [lang, setLang] = useState('he');
@@ -70,9 +84,18 @@ export default function App() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const user = usersDb.find(u => u.username === loginInput.username && u.password === loginInput.password);
-    if (user) setCurrentUser(user);
-    else alert('שגיאה. נסה: admin / worker עם סיסמה 123');
+    const user = usersDb.find(u => u.username.trim() === loginInput.username.trim() && u.password === loginInput.password);
+    if (user) {
+      setCurrentUser(user);
+      setLoginInput({ username: '', password: '' }); // איפוס השדות לאחר כניסה
+    } else {
+      alert('שם המשתמש או הסיסמה שגויים. (ודא שאין רווחים מיותרים)');
+    }
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setClockedIn(false);
   };
 
   const PushNotificationOverlay = () => (
@@ -113,7 +136,7 @@ export default function App() {
   }
 
   // ==========================================
-  // דשבורד משרדי (מנהל במחשב) - עם תפריט צד
+  // דשבורד משרדי (מנהל במחשב)
   // ==========================================
   if (currentUser.role === 'MANAGER' && !isMobileDevice) {
     return (
@@ -124,7 +147,7 @@ export default function App() {
             <div className="p-2 bg-amber-500 text-neutral-950 rounded-xl"><IconHardHat /></div>
             <div><h2 className="text-base font-bold">{currentUser.name}</h2><span className="text-[11px] text-neutral-400">דשבורד משרדי מורחב</span></div>
           </div>
-          <button onClick={() => setCurrentUser(null)} className="flex items-center gap-2 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-xs"><IconLogout /> ניתוק</button>
+          <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-xs"><IconLogout /> ניתוק</button>
         </header>
 
         <div className="flex flex-1 overflow-hidden">
@@ -149,7 +172,7 @@ export default function App() {
                   <h3 className="text-sm font-bold text-white flex items-center gap-2"><IconMap /> הערות קבלנים על תוכניות מהשטח</h3>
                   {markedBlueprint ? (
                     <div className="p-4 bg-neutral-950 border border-rose-500/30 rounded-xl flex items-center justify-between">
-                      <div><strong className="text-rose-400 block text-sm">התקבלה נעיצה מקבלן שלד (יוסי) בקומה 2</strong><span className="text-xs text-neutral-400">הערה: {markedBlueprint.note}</span></div>
+                      <div><strong className="text-rose-400 block text-sm">התקבלה נעיצה מקבלן שלד בקומה 2</strong><span className="text-xs text-neutral-400">הערה: {markedBlueprint.note}</span></div>
                       <button onClick={() => setMarkedBlueprint(null)} className="px-4 py-2 bg-neutral-800 hover:bg-emerald-500 hover:text-neutral-950 rounded-lg text-xs font-bold transition">סמן כטופל</button>
                     </div>
                   ) : <p className="text-xs text-neutral-500">אין נעיצות חדשות על תוכניות.</p>}
@@ -157,30 +180,30 @@ export default function App() {
               </div>
             )}
 
-            {/* מסך 2: הוספת מסמכים לפנקס הכללי ולתוכניות */}
+            {/* מסך 2: הוספת מסמכים */}
             {adminTab === 'DOCS' && (
               <div className="space-y-6 max-w-3xl">
                 <h3 className="text-xl font-black text-white flex items-center gap-2"><IconFileText /> ניהול פנקס אתר ותוכניות בנייה</h3>
                 
-                {/* טופס הוספת מסמך */}
                 <div className="flex gap-2">
-                  <input type="text" placeholder="שם המסמך / שרטוט (למשל: תוכנית חשמל קומה 3)" value={newDocTitle} onChange={e=>setNewDocTitle(e.target.value)} className="flex-1 p-3 bg-neutral-900 border border-neutral-800 rounded-xl text-white outline-none"/>
+                  <input type="text" placeholder="שם המסמך / שרטוט" value={newDocTitle} onChange={e=>setNewDocTitle(e.target.value)} className="flex-1 p-3 bg-neutral-900 border border-neutral-800 rounded-xl text-white outline-none"/>
                   <select value={newDocType} onChange={e=>setNewDocType(e.target.value as any)} className="p-3 bg-neutral-900 border border-neutral-800 rounded-xl text-white outline-none">
                     <option value="DOC">מסמך אתר (היתר/ביטוח)</option>
                     <option value="BLUEPRINT">תוכנית עבודה (שרטוט לקבלן)</option>
                   </select>
-                  <button onClick={() => { if(newDocTitle) { setDocumentsDb([{ id: Date.now().toString(), title: newDocTitle, type: newDocType, date: new Date().toLocaleDateString('he-IL') }, ...documentsDb]); setNewDocTitle(''); } }} className="px-6 flex items-center gap-2 bg-blue-500 text-white font-bold rounded-xl"><IconPlus /> הוסף פריט</button>
+                  <button onClick={() => { if(newDocTitle) { setDocumentsDb([{ id: Date.now().toString(), title: newDocTitle, type: newDocType, date: new Date().toLocaleDateString('he-IL') }, ...documentsDb]); setNewDocTitle(''); } }} className="px-6 flex items-center gap-2 bg-blue-500 text-white font-bold rounded-xl"><IconPlus /> הוסף</button>
                 </div>
 
                 <div className="bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden">
                   <table className="w-full text-sm text-right text-neutral-300">
-                    <thead className="bg-neutral-950 text-neutral-500"><tr><th className="p-4">שם קובץ</th><th className="p-4">סוג</th><th className="p-4">תאריך העלאה</th></tr></thead>
+                    <thead className="bg-neutral-950 text-neutral-500"><tr><th className="p-4">שם קובץ</th><th className="p-4">סוג</th><th className="p-4">תאריך</th><th className="p-4">פעולה</th></tr></thead>
                     <tbody>
                       {documentsDb.map(doc => (
                         <tr key={doc.id} className="border-t border-neutral-800">
                           <td className="p-4 font-bold text-white">{doc.title}</td>
-                          <td className="p-4">{doc.type === 'DOC' ? <span className="bg-neutral-800 px-2 py-1 rounded text-[10px] text-amber-400">מסמך אתר</span> : <span className="bg-neutral-800 px-2 py-1 rounded text-[10px] text-blue-400">שרטוט קבלן</span>}</td>
+                          <td className="p-4">{doc.type === 'DOC' ? <span className="text-amber-400">מסמך</span> : <span className="text-blue-400">שרטוט</span>}</td>
                           <td className="p-4">{doc.date}</td>
+                          <td className="p-4"><button onClick={() => setDocumentsDb(documentsDb.filter(d => d.id !== doc.id))} className="text-rose-400">מחק</button></td>
                         </tr>
                       ))}
                     </tbody>
@@ -189,26 +212,31 @@ export default function App() {
               </div>
             )}
 
-            {/* מסך 3: ניהול משתמשים וקבלנים */}
+            {/* מסך 3: ניהול משתמשים */}
             {adminTab === 'USERS' && (
               <div className="space-y-6 max-w-4xl">
-                <h3 className="text-xl font-black text-white flex items-center gap-2"><IconUsers /> ניהול צוות, פועלים וקבלנים</h3>
+                <h3 className="text-xl font-black text-white flex items-center gap-2"><IconUsers /> ניהול משתמשים וקבלנים</h3>
                 
                 <form onSubmit={(e) => { e.preventDefault(); if(newUser.username) { setUsersDb([...usersDb, { ...newUser, id: Date.now().toString() }]); setNewUser({ username: '', password: '', name: '', role: 'WORKER' }); } }} className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-neutral-900 p-5 rounded-3xl border border-neutral-800 text-sm">
                   <div className="col-span-2 md:col-span-1"><label className="text-neutral-400 block mb-1">שם מלא</label><input type="text" value={newUser.name} onChange={e=>setNewUser({...newUser, name: e.target.value})} required className="w-full p-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-white"/></div>
-                  <div className="col-span-2 md:col-span-1"><label className="text-neutral-400 block mb-1">שם משתמש (Login)</label><input type="text" value={newUser.username} onChange={e=>setNewUser({...newUser, username: e.target.value})} required className="w-full p-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-white" dir="ltr"/></div>
+                  <div className="col-span-2 md:col-span-1"><label className="text-neutral-400 block mb-1">שם משתמש</label><input type="text" value={newUser.username} onChange={e=>setNewUser({...newUser, username: e.target.value})} required className="w-full p-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-white" dir="ltr"/></div>
                   <div className="col-span-2 md:col-span-1"><label className="text-neutral-400 block mb-1">סיסמה</label><input type="text" value={newUser.password} onChange={e=>setNewUser({...newUser, password: e.target.value})} required className="w-full p-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-white" dir="ltr"/></div>
-                  <div className="col-span-2 md:col-span-1"><label className="text-neutral-400 block mb-1">תפקיד הרשאה</label><select value={newUser.role} onChange={e=>setNewUser({...newUser, role: e.target.value as Role})} className="w-full p-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-white"><option value="WORKER">פועל</option><option value="CONTRACTOR">קבלן משנה</option><option value="CRANE">מנופאי</option><option value="SIGNALER">אתת</option><option value="MANAGER">מנהל משרד</option></select></div>
-                  <button type="submit" className="col-span-2 md:col-span-4 py-3 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-black rounded-xl mt-2 transition">הוסף משתמש לאתר</button>
+                  <div className="col-span-2 md:col-span-1"><label className="text-neutral-400 block mb-1">הרשאה</label><select value={newUser.role} onChange={e=>setNewUser({...newUser, role: e.target.value as Role})} className="w-full p-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-white"><option value="WORKER">פועל</option><option value="CONTRACTOR">קבלן משנה</option><option value="CRANE">מנופאי</option><option value="SIGNALER">אתת</option><option value="MANAGER">מנהל</option></select></div>
+                  <button type="submit" className="col-span-2 md:col-span-4 py-3 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-black rounded-xl mt-2 transition">הוסף למערכת</button>
                 </form>
 
                 <div className="bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden">
                   <table className="w-full text-sm text-right text-neutral-300">
-                    <thead className="bg-neutral-950 text-neutral-500"><tr><th className="p-4">שם העובד/קבלן</th><th className="p-4">שם משתמש</th><th className="p-4">סיסמה</th><th className="p-4">תפקיד</th><th className="p-4">פעולה</th></tr></thead>
+                    <thead className="bg-neutral-950 text-neutral-500"><tr><th className="p-4">שם העובד</th><th className="p-4">שם משתמש</th><th className="p-4">סיסמה</th><th className="p-4">תפקיד</th><th className="p-4">פעולה</th></tr></thead>
                     <tbody>
                       {usersDb.map(u => (
-                        <tr key={u.id} className="border-t border-neutral-800"><td className="p-4 text-white font-bold">{u.name}</td><td className="p-4 font-mono text-amber-400">{u.username}</td><td className="p-4 font-mono">{u.password}</td><td className="p-4">{u.role}</td>
-                        <td className="p-4"><button onClick={() => setUsersDb(usersDb.filter(user => user.id !== u.id))} className="text-rose-400 hover:text-rose-300">מחק</button></td></tr>
+                        <tr key={u.id} className="border-t border-neutral-800">
+                          <td className="p-4 text-white font-bold">{u.name}</td>
+                          <td className="p-4 font-mono text-amber-400">{u.username}</td>
+                          <td className="p-4 font-mono">{u.password}</td>
+                          <td className="p-4">{u.role}</td>
+                          <td className="p-4"><button onClick={() => setUsersDb(usersDb.filter(user => user.id !== u.id))} className="text-rose-400 hover:text-rose-300">מחק</button></td>
+                        </tr>
                       ))}
                     </tbody>
                   </table>
@@ -222,12 +250,11 @@ export default function App() {
   }
 
   // ==========================================
-  // אפליקציית נייד (מנהל, פועל, אתת, מנופאי, קבלן)
+  // אפליקציית נייד
   // ==========================================
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans flex flex-col select-none" dir="rtl">
       <PushNotificationOverlay />
-      
       <header className="bg-neutral-900 border-b border-neutral-800 px-4 py-3 flex items-center justify-between z-30 sticky top-0 shadow-lg">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-amber-500 text-neutral-950 rounded-xl"><IconHardHat /></div>
@@ -238,107 +265,62 @@ export default function App() {
             </span>
           </div>
         </div>
-        <button onClick={() => { setCurrentUser(null); setClockedIn(false); }} className="text-neutral-400 p-2 hover:bg-neutral-800 rounded-lg"><IconLogout /></button>
+        <button onClick={handleLogout} className="text-neutral-400 p-2 hover:bg-neutral-800 rounded-lg"><IconLogout /></button>
       </header>
 
       <main className="flex-1 p-4 max-w-md mx-auto w-full space-y-5 pb-20">
         
-        {/* === אפליקציית מנהל עבודה בנייד (משודרג) === */}
         {currentUser.role === 'MANAGER' && (
           <div className="space-y-4">
-            <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-between">
-              <div>
-                <span className="text-emerald-400 font-bold text-sm block">תצוגת מנהל שטח פעילה</span>
-                <span className="text-xs text-neutral-400">קבלת התראות ואישורים בלייב.</span>
-              </div>
-            </div>
-
-            {/* מכשיר קשר מנהלים */}
-            <button onMouseDown={() => { setIsTalking(true); triggerPush(`שידור למנהלים: ${currentUser.name}`); }} onMouseUp={() => setIsTalking(false)} onTouchStart={() => { setIsTalking(true); triggerPush(`שידור למנהלים: ${currentUser.name}`); }} onTouchEnd={() => setIsTalking(false)} className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 transition-all ${isTalking ? 'bg-amber-500 text-neutral-950 scale-95' : 'bg-neutral-900 border border-neutral-800 text-neutral-400'}`}>
-              <IconRadio /><span className="font-bold text-sm">{isTalking ? 'משדר בערוץ...' : 'לחץ לדבר (ערוץ מנהלים)'}</span>
-            </button>
-
-            {/* אישור חומרים מקבלנים */}
-            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 space-y-3">
-              <h3 className="text-xs font-bold text-white flex items-center gap-2"><IconShoppingCart /> דרישות חומר מהשטח</h3>
-              <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl text-xs space-y-2">
-                <div className="flex justify-between"><span className="text-amber-400 font-bold">בטון ב-30 (20 קוב)</span><span className="text-neutral-500">קבלן שלד</span></div>
-                <div className="flex gap-2"><button className="flex-1 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg">אשר במשרד</button><button className="flex-1 py-1.5 bg-neutral-800 rounded-lg">דחה</button></div>
-              </div>
-            </div>
-
-            {/* פנקס כללי בנייד */}
-            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 space-y-3">
-              <h3 className="text-xs font-bold text-white flex items-center gap-2"><IconFileText /> פנקס מסמכי אתר זמין</h3>
-              {documentsDb.filter(d => d.type === 'DOC').map(doc => (
-                <div key={doc.id} className="p-2 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-300 flex justify-between">
-                  <span>{doc.title}</span><span className="text-blue-400">הצג</span>
-                </div>
-              ))}
-            </div>
+            <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl"><span className="text-emerald-400 font-bold text-sm block">תצוגת מנהל שטח פעילה</span><span className="text-xs text-neutral-400">לניהול מלא, התחבר מהמחשב.</span></div>
+            <button onMouseDown={() => { setIsTalking(true); triggerPush(`שידור למנהלים: ${currentUser.name}`); }} onMouseUp={() => setIsTalking(false)} onTouchStart={() => { setIsTalking(true); triggerPush(`שידור למנהלים: ${currentUser.name}`); }} onTouchEnd={() => setIsTalking(false)} className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 transition-all ${isTalking ? 'bg-amber-500 text-neutral-950 scale-95' : 'bg-neutral-900 border border-neutral-800 text-neutral-400'}`}><IconRadio /><span className="font-bold text-sm">{isTalking ? 'משדר בערוץ...' : 'לחץ לדבר (ערוץ מנהלים)'}</span></button>
+            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 space-y-3"><h3 className="text-xs font-bold text-white flex items-center gap-2"><IconShoppingCart /> דרישות חומר מהשטח</h3><div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl text-xs space-y-2"><div className="flex justify-between"><span className="text-amber-400 font-bold">בטון ב-30 (20 קוב)</span><span className="text-neutral-500">קבלן שלד</span></div><div className="flex gap-2"><button className="flex-1 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg">אשר במשרד</button></div></div></div>
+            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 space-y-3"><h3 className="text-xs font-bold text-white flex items-center gap-2"><IconFileText /> מסמכי אתר ותוכניות</h3>{documentsDb.map(doc => (<div key={doc.id} className="p-2 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-300 flex justify-between"><span>{doc.title}</span><span className="text-blue-400">הצג</span></div>))}</div>
           </div>
         )}
 
-        {/* === שער בטיחות לכל השאר (לפני כניסה) === */}
         {currentUser.role !== 'MANAGER' && !clockedIn && (
           <div className="p-5 bg-neutral-900 border-2 border-amber-500/50 rounded-3xl space-y-4 shadow-xl mt-4">
             <div className="flex items-center gap-2 text-amber-400"><IconShield /><h3 className="text-sm font-black">{currentUser.role === 'CRANE' ? 'צ\'ק-ליסט מנוף' : 'שער בטיחות אישי'}</h3></div>
-            
             {currentUser.role === 'CRANE' ? (
               <div className="space-y-2.5 text-xs">
                 <label className="flex items-center gap-3 p-3 bg-neutral-950 rounded-xl"><input type="checkbox" onChange={e => setCraneChecklist(p => ({...p, brakes: e.target.checked}))} className="w-4 h-4 accent-amber-500"/><span>בדיקת בלמים תקינה</span></label>
-                <label className="flex items-center gap-3 p-3 bg-neutral-950 rounded-xl"><input type="checkbox" onChange={e => setCraneChecklist(p => ({...p, cables: e.target.checked}))} className="w-4 h-4 accent-amber-500"/><span>כבלים ללא שחיקה</span></label>
-                <label className="flex items-center gap-3 p-3 bg-neutral-950 rounded-xl"><input type="checkbox" onChange={e => setCraneChecklist(p => ({...p, limiters: e.target.checked}))} className="w-4 h-4 accent-amber-500"/><span>מגבילי תנועה תקינים</span></label>
-                <button disabled={!craneChecklist.brakes || !craneChecklist.cables || !craneChecklist.limiters} onClick={() => setClockedIn(true)} className="w-full py-4 bg-amber-500 disabled:bg-neutral-800 disabled:text-neutral-600 text-neutral-950 font-black rounded-xl text-xs mt-4 transition">הפעל עגורן</button>
+                <label className="flex items-center gap-3 p-3 bg-neutral-950 rounded-xl"><input type="checkbox" onChange={e => setCraneChecklist(p => ({...p, cables: e.target.checked}))} className="w-4 h-4 accent-amber-500"/><span>כבלים תקינים</span></label>
+                <label className="flex items-center gap-3 p-3 bg-neutral-950 rounded-xl"><input type="checkbox" onChange={e => setCraneChecklist(p => ({...p, limiters: e.target.checked}))} className="w-4 h-4 accent-amber-500"/><span>מגבילי תנועה</span></label>
+                <button disabled={!craneChecklist.brakes || !craneChecklist.cables || !craneChecklist.limiters} onClick={() => setClockedIn(true)} className="w-full py-4 bg-amber-500 disabled:bg-neutral-800 disabled:text-neutral-600 text-neutral-950 font-black rounded-xl text-xs mt-4">הפעל עגורן</button>
               </div>
             ) : (
               <div className="space-y-2.5 text-xs">
                 <label className="flex items-center gap-3 p-3 bg-neutral-950 rounded-xl"><input type="checkbox" onChange={e => setPpeChecked(p => ({...p, helmet: e.target.checked}))} className="w-4 h-4 accent-amber-500"/><span>קסדת מגן רכוסה</span></label>
                 <label className="flex items-center gap-3 p-3 bg-neutral-950 rounded-xl"><input type="checkbox" onChange={e => setPpeChecked(p => ({...p, boots: e.target.checked}))} className="w-4 h-4 accent-amber-500"/><span>נעלי עבודה</span></label>
                 <label className="flex items-center gap-3 p-3 bg-neutral-950 rounded-xl"><input type="checkbox" onChange={e => setPpeChecked(p => ({...p, vest: e.target.checked}))} className="w-4 h-4 accent-amber-500"/><span>אפוד זוהר</span></label>
-                <button disabled={!ppeChecked.helmet || !ppeChecked.boots || !ppeChecked.vest} onClick={() => setClockedIn(true)} className="w-full py-4 bg-amber-500 disabled:bg-neutral-800 disabled:text-neutral-600 text-neutral-950 font-black rounded-xl text-xs mt-4 transition">החתם נוכחות</button>
+                <button disabled={!ppeChecked.helmet || !ppeChecked.boots || !ppeChecked.vest} onClick={() => setClockedIn(true)} className="w-full py-4 bg-amber-500 disabled:bg-neutral-800 disabled:text-neutral-600 text-neutral-950 font-black rounded-xl text-xs mt-4">החתם נוכחות</button>
               </div>
             )}
           </div>
         )}
 
-        {/* === אזור פעיל בשטח לאחר כניסה === */}
         {currentUser.role !== 'MANAGER' && clockedIn && (
           <div className="space-y-4 animate-in fade-in">
             <div className="relative">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-neutral-950 px-3 py-1 rounded-full border border-neutral-800 text-[10px] text-neutral-400 z-10">{currentUser.role === 'CRANE' ? 'ערוץ נעול: אתת בלבד' : currentUser.role === 'SIGNALER' ? 'ערוץ נעול: מנופאי בלבד' : 'ערוץ פתוח / בחר נמען'}</div>
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-neutral-950 px-3 py-1 rounded-full border border-neutral-800 text-[10px] text-neutral-400 z-10">{currentUser.role === 'CRANE' ? 'ערוץ נעול: אתת בלבד' : currentUser.role === 'SIGNALER' ? 'ערוץ נעול: מנופאי בלבד' : 'ערוץ פתוח'}</div>
               <button onMouseDown={() => { setIsTalking(true); triggerPush(`קריאת קשר נכנסת מ${currentUser.name}`); }} onMouseUp={() => setIsTalking(false)} onTouchStart={() => { setIsTalking(true); triggerPush(`קריאת קשר נכנסת מ${currentUser.name}`); }} onTouchEnd={() => setIsTalking(false)} className={`w-full py-8 rounded-3xl flex flex-col items-center justify-center gap-3 transition-all duration-150 ${isTalking ? 'bg-amber-500 text-neutral-950 scale-95 shadow-[0_0_40px_rgba(245,158,11,0.4)]' : 'bg-neutral-900 border-2 border-neutral-800 text-neutral-400'}`}>
-                <IconRadio /><span className="font-black text-sm">{isTalking ? 'מקליט... שחרר לשליחה' : 'החזק כדי לדבר (ווקי-טוקי)'}</span>
+                <IconRadio /><span className="font-black text-sm">{isTalking ? 'מקליט...' : 'החזק כדי לדבר'}</span>
               </button>
             </div>
 
             <div className="grid grid-cols-2 gap-3 mt-4">
-              {currentUser.role !== 'CRANE' && (
-                <button className="p-4 bg-neutral-900 border border-neutral-800 rounded-2xl flex flex-col items-center gap-2"><IconCamera /><span className="text-xs font-bold">צלם מהשטח</span></button>
-              )}
-
-              {currentUser.role === 'CRANE' && (
-                <div className="col-span-2 p-5 bg-neutral-900 border border-neutral-800 rounded-2xl flex justify-between">
-                  <div className="flex items-center gap-3"><IconWind /><div><span className="block text-sm font-bold text-white">מד רוח עגורן</span><span className="text-[10px] text-emerald-400">תקין לעבודה</span></div></div>
-                  <div className="text-3xl font-black text-amber-400 font-mono">22</div>
-                </div>
-              )}
-
+              {currentUser.role !== 'CRANE' && (<button className="p-4 bg-neutral-900 border border-neutral-800 rounded-2xl flex flex-col items-center gap-2"><IconCamera /><span className="text-xs font-bold">צלם מהשטח</span></button>)}
+              {currentUser.role === 'CRANE' && (<div className="col-span-2 p-5 bg-neutral-900 border border-neutral-800 rounded-2xl flex justify-between"><div className="flex items-center gap-3"><IconWind /><div><span className="block text-sm font-bold text-white">מד רוח עגורן</span><span className="text-[10px] text-emerald-400">תקין לעבודה</span></div></div><div className="text-3xl font-black text-amber-400 font-mono">22</div></div>)}
               {currentUser.role === 'CONTRACTOR' && (
                 <>
-                  <button onClick={() => triggerPush('הזמנת חומרים נשלחה לאישור המנהל')} className="p-4 bg-neutral-900 border border-neutral-800 rounded-2xl flex flex-col items-center gap-2"><IconShoppingCart /><span className="text-xs font-bold text-amber-400">הזמנת חומרים</span></button>
-                  
+                  <button onClick={() => triggerPush('הזמנת חומרים נשלחה')} className="p-4 bg-neutral-900 border border-neutral-800 rounded-2xl flex flex-col items-center gap-2"><IconShoppingCart /><span className="text-xs font-bold text-amber-400">הזמנת חומרים</span></button>
                   <div className="col-span-2 bg-neutral-900 border border-neutral-800 rounded-3xl p-4 space-y-3">
                     <div className="flex items-center gap-2 text-white font-bold text-sm"><IconMap /> תוכניות עבודה לסימון</div>
-                    <div className="flex flex-col gap-2 mb-2">
-                      {documentsDb.filter(d => d.type === 'BLUEPRINT').map(bp => (
-                        <div key={bp.id} className="text-xs bg-neutral-950 p-2 rounded text-neutral-400">{bp.title}</div>
-                      ))}
-                    </div>
-                    <div className="w-full h-32 bg-neutral-800 rounded-xl relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] cursor-crosshair border border-neutral-700" onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); setMarkedBlueprint({ x: e.clientX - rect.left, y: e.clientY - rect.top, note: 'חסימת תוואי ביוב' }); triggerPush('סימון בעיה נשלח לדשבורד המנהל'); }}>
+                    <div className="flex flex-col gap-2 mb-2">{documentsDb.filter(d => d.type === 'BLUEPRINT').map(bp => (<div key={bp.id} className="text-xs bg-neutral-950 p-2 rounded text-neutral-400">{bp.title}</div>))}</div>
+                    <div className="w-full h-32 bg-neutral-800 rounded-xl relative overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] cursor-crosshair border border-neutral-700" onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); setMarkedBlueprint({ x: e.clientX - rect.left, y: e.clientY - rect.top, note: 'חסימת תוואי ביוב' }); triggerPush('סימון בעיה נשלח לדשבורד'); }}>
                       {markedBlueprint && <div className="absolute w-4 h-4 bg-rose-500 rounded-full animate-ping" style={{ left: markedBlueprint.x - 8, top: markedBlueprint.y - 8 }}></div>}
                     </div>
-                    {markedBlueprint && <p className="text-[10px] text-emerald-400 text-center">ננעץ ונשלח בהצלחה למשרד.</p>}
                   </div>
                 </>
               )}
